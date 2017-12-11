@@ -63,6 +63,7 @@ public class ApplicationStatusManager
     private final OfflineProcessor processor;
     private final long creationTimeStamp;
     private final SntpClient sntpClient;
+    private boolean sendIp;
 
     private String ntpServer;
 
@@ -90,8 +91,9 @@ public class ApplicationStatusManager
         }
     };
 
-    public ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate) {
+    public ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate, boolean sendIp) {
         super(service);
+        this.sendIp = sendIp;
         serverTopic = createTopic("application_server_status", ApplicationServerStatus.class);
         recordCountsTopic = createTopic("application_record_counts", ApplicationRecordCounts.class);
         uptimeTopic = createTopic("application_uptime", ApplicationUptime.class);
@@ -195,7 +197,7 @@ public class ApplicationStatusManager
             default:
                 status = ServerStatus.UNKNOWN;
         }
-        String ipAddress = getIpAddress();
+        String ipAddress = sendIp ? getIpAddress() : null;
         logger.info("Server Status: {}; Device IP: {}", status, ipAddress);
 
         ApplicationServerStatus value = new ApplicationServerStatus(time, status, ipAddress);
@@ -265,5 +267,9 @@ public class ApplicationStatusManager
         this.processor.close();
         getService().unregisterReceiver(serverStatusListener);
         super.close();
+    }
+
+    public void setSendIp(boolean sendIp) {
+        this.sendIp = sendIp;
     }
 }
