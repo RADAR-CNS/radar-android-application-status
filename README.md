@@ -1,5 +1,7 @@
 # Application status plugin for RADAR-pRMT
 
+[![Build Status](https://travis-ci.org/RADAR-CNS/radar-android-application-status.svg?branch=master)](https://travis-ci.org/RADAR-CNS/radar-android-application-status)
+
 Plugin that sends application statuses about the RADAR pRMT app.
 
 ## Installation
