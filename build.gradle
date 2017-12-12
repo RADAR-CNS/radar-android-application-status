@@ -103,10 +103,6 @@ dependencies {
     testRuntimeOnly 'org.slf4j:slf4j-simple:1.7.25'
 }
 
-//---------------------------------------------------------------------------//
-// Build system metadata                                                     //
-//---------------------------------------------------------------------------//
-
 ext.sharedManifest = manifest {
     attributes("Implementation-Title": moduleName,
             "Implementation-Version": version)
@@ -120,8 +116,14 @@ task sourcesJar(type: Jar) {
 
 task javadoc(type: Javadoc) {
     source = android.sourceSets.main.java.srcDirs
-    classpath += configurations.compile
+    android.libraryVariants.all { variant ->
+        if (variant.name == 'release') {
+            owner.classpath += variant.javaCompiler.classpath
+        }
+    }
     classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+    exclude '**/R.java'
+    exclude '**/BuildConfig.java'
 }
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
@@ -172,6 +174,8 @@ ext.pomConfig = {
     }
 }
 
+apply plugin: 'maven-publish'
+
 publishing {
     publications {
         RadarPublication(MavenPublication) {
@@ -188,21 +192,26 @@ publishing {
                 def dependenciesNode = root.appendNode('dependencies')
 
                 //Defining configuration names from which dependencies will be taken (debugCompile or releaseCompile and compile)
-                configurations['compile'].allDependencies.each {
-                    if (it.group != null && it.name != null) {
-                        def dependencyNode = dependenciesNode.appendNode('dependency')
-                        dependencyNode.appendNode('groupId', it.group)
-                        dependencyNode.appendNode('artifactId', it.name)
-                        dependencyNode.appendNode('version', it.version)
 
-                        //If there are any exclusions in dependency
-                        if (it.excludeRules.size() > 0) {
-                            def exclusionsNode = dependencyNode.appendNode('exclusions')
-                            it.excludeRules.each { rule ->
-                                def exclusionNode = exclusionsNode.appendNode('exclusion')
-                                exclusionNode.appendNode('groupId', rule.group)
-                                if (rule.module) {
-                                    exclusionNode.appendNode('artifactId', rule.module)
+                android.libraryVariants.all { variant ->
+                    if (variant.name == 'release') {
+                        variant.compileConfiguration.allDependencies.each {
+                            if (it.group != null && it.name != null) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', it.group)
+                                dependencyNode.appendNode('artifactId', it.name)
+                                dependencyNode.appendNode('version', it.version)
+
+                                //If there are any exclusions in dependency
+                                if (it.excludeRules.size() > 0) {
+                                    def exclusionsNode = dependencyNode.appendNode('exclusions')
+                                    it.excludeRules.each { rule ->
+                                        def exclusionNode = exclusionsNode.appendNode('exclusion')
+                                        exclusionNode.appendNode('groupId', rule.group)
+                                        if (rule.module) {
+                                            exclusionNode.appendNode('artifactId', rule.module)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -211,23 +220,6 @@ publishing {
 
                 root.children().last() + pomConfig
             }
-        }
-    }
-}
-
-install {
-    repositories.mavenInstaller {
-        pom.project {
-            groupId project.group
-            artifactId moduleName
-            version project.version
-        }
-        pom.withXml {
-            def root = asNode()
-            root.appendNode('description', moduleDescription)
-            root.appendNode('name', moduleName)
-            root.appendNode('url', githubUrl)
-            root.children().last() + pomConfig
         }
     }
 }
@@ -275,7 +267,7 @@ artifactory {
 }
 
 artifactoryPublish {
-    publications('RadarPublication')
+    publications 'RadarPublication'
     dependsOn 'assembleRelease'
 }
 
