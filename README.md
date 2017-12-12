@@ -33,7 +33,7 @@ This plugin takes the following Firebase configuration parameters:
 This plugin produces data for the following topics:
 
 | Topic | Type | Description |
-| ---- | ---- | ------- | ----------- |
+| ----- | ---- | ----------- |
 | `application_external_time` | `org.radarcns.monitor.ApplicationExternalTime` | External NTP time. Requires `ntp_server` parameter to be set. |
 | `application_record_counts` | `org.radarcns.monitor.ApplicationRecordCounts` | Number of records sent and in queue. |
 | `application_uptime` | `org.radarcns.monitor.ApplicationUptime` | Time since the device booted. |
