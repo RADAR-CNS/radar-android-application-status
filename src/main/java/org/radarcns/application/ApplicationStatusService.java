@@ -17,28 +17,21 @@
 package org.radarcns.application;
 
 import android.os.Bundle;
-import org.radarcns.android.RadarConfiguration;
-import org.radarcns.android.device.DeviceManager;
 import org.radarcns.android.device.DeviceService;
 
-import static org.radarcns.android.RadarConfiguration.SOURCE_ID_KEY;
 import static org.radarcns.application.ApplicationServiceProvider.NTP_SERVER_KEY;
+import static org.radarcns.application.ApplicationServiceProvider.SEND_IP_KEY;
 import static org.radarcns.application.ApplicationServiceProvider.UPDATE_RATE_KEY;
 
 public class ApplicationStatusService extends DeviceService<ApplicationState> {
-    private String sourceId;
     private String ntpServer;
     private long updateRate;
+    private boolean sendIp;
 
     @Override
-    protected DeviceManager createDeviceManager() {
-        if (sourceId == null) {
-            sourceId = RadarConfiguration.getOrSetUUID(getApplicationContext(), SOURCE_ID_KEY);
-        }
-        ApplicationStatusManager manager = new ApplicationStatusManager(
-                this, ntpServer, updateRate);
-        manager.setApplicationStatusUpdateRate(updateRate);
-        return manager;
+    protected ApplicationStatusManager createDeviceManager() {
+        return new ApplicationStatusManager(
+                this, ntpServer, updateRate, sendIp);
     }
 
     @Override
@@ -51,10 +44,12 @@ public class ApplicationStatusService extends DeviceService<ApplicationState> {
         super.onInvocation(bundle);
         updateRate = bundle.getLong(UPDATE_RATE_KEY) * 1000L;
         ntpServer = bundle.getString(NTP_SERVER_KEY);
+        sendIp = bundle.getBoolean(SEND_IP_KEY);
         ApplicationStatusManager manager = (ApplicationStatusManager)getDeviceManager();
         if (manager != null) {
             manager.setApplicationStatusUpdateRate(updateRate);
             manager.setNtpServer(ntpServer);
+            manager.setSendIp(sendIp);
         }
     }
 }
