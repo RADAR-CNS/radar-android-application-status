@@ -23,6 +23,8 @@ import android.content.IntentFilter;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.util.Pair;
+
+import org.radarcns.android.auth.AppSource;
 import org.radarcns.android.device.AbstractDeviceManager;
 import org.radarcns.android.device.DeviceStatusListener;
 import org.radarcns.android.kafka.ServerStatusListener;
@@ -271,5 +273,11 @@ public class ApplicationStatusManager
 
     public void setSendIp(boolean sendIp) {
         this.sendIp = sendIp;
+    }
+
+    @Override
+    public void didRegister(AppSource source) {
+        super.didRegister(source);
+        getState().getId().setSourceId(source.getSourceId());
     }
 }
