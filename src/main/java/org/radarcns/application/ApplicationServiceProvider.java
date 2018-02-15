@@ -17,9 +17,8 @@
 package org.radarcns.application;
 
 import android.os.Bundle;
-import android.os.Parcelable;
-
 import android.support.annotation.NonNull;
+
 import org.radarcns.android.RadarConfiguration;
 import org.radarcns.android.device.DeviceServiceProvider;
 
@@ -29,11 +28,14 @@ import java.util.List;
 public class ApplicationServiceProvider extends DeviceServiceProvider<ApplicationState> {
     private static final String PREFIX = ApplicationServiceProvider.class.getPackage().getName() + '.';
     private static final String UPDATE_RATE = "application_status_update_rate";
+    private static final String TZ_UPDATE_RATE = "application_time_zone_update_rate";
     private static final String SEND_IP = "application_send_ip";
     private static final long UPDATE_RATE_DEFAULT = 300L; // seconds == 5 minutes
+    private static final long TZ_UPDATE_RATE_DEFAULT = 86400L; // seconds == 1 day
     private static final String NTP_SERVER_CONFIG = "ntp_server";
     public static final String SEND_IP_KEY = PREFIX + SEND_IP;
     public static final String UPDATE_RATE_KEY = PREFIX + UPDATE_RATE;
+    public static final String TZ_UPDATE_RATE_KEY = PREFIX + TZ_UPDATE_RATE;
     public static final String NTP_SERVER_KEY = PREFIX + NTP_SERVER_CONFIG;
 
 
@@ -64,6 +66,7 @@ public class ApplicationServiceProvider extends DeviceServiceProvider<Applicatio
         bundle.putLong(UPDATE_RATE_KEY, config.getLong(UPDATE_RATE, UPDATE_RATE_DEFAULT));
         bundle.putString(NTP_SERVER_KEY, config.getString(NTP_SERVER_CONFIG, null));
         bundle.putBoolean(SEND_IP_KEY, config.getBoolean(SEND_IP, false));
+        bundle.putLong(TZ_UPDATE_RATE_KEY, config.getLong(TZ_UPDATE_RATE, TZ_UPDATE_RATE_DEFAULT));
     }
 
     @Override

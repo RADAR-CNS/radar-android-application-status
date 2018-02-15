@@ -39,6 +39,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Enumeration;
 import java.util.Set;
+import java.util.TimeZone;
 
 import static org.radarcns.android.device.DeviceService.CACHE_RECORDS_SENT_NUMBER;
 import static org.radarcns.android.device.DeviceService.CACHE_RECORDS_UNSENT_NUMBER;
@@ -53,16 +54,20 @@ public class ApplicationStatusManager
     private static final Logger logger = LoggerFactory.getLogger(ApplicationStatusManager.class);
     private static final Long NUMBER_UNKNOWN = -1L;
     private static final int APPLICATION_PROCESSOR_REQUEST_CODE = 72553575;
+    private static final int APPLICATION_TZ_PROCESSOR_REQUEST_CODE = 72553576;
     private static final String APPLICATION_PROCESSOR_REQUEST_NAME = ApplicationStatusManager.class.getName();
+    private static final String APPLICATION_TZ_PROCESSOR_REQUEST_NAME = APPLICATION_PROCESSOR_REQUEST_NAME + ".timeZone";
 
     private final AvroTopic<ObservationKey, ApplicationServerStatus> serverTopic;
     private final AvroTopic<ObservationKey, ApplicationRecordCounts> recordCountsTopic;
     private final AvroTopic<ObservationKey, ApplicationUptime> uptimeTopic;
     private final AvroTopic<ObservationKey, ApplicationExternalTime> ntpTopic;
+    private final AvroTopic<ObservationKey, ApplicationTimeZone> timeZoneTopic;
 
     private final OfflineProcessor processor;
     private final long creationTimeStamp;
     private final SntpClient sntpClient;
+    private OfflineProcessor tzProcessor;
     private boolean sendIp;
 
     private String ntpServer;
@@ -72,38 +77,48 @@ public class ApplicationStatusManager
     private final BroadcastReceiver serverStatusListener = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(SERVER_STATUS_CHANGED)) {
-                final ServerStatusListener.Status status = ServerStatusListener.Status.values()[
-                        intent.getIntExtra(SERVER_STATUS_CHANGED, 0)];
-                getState().setServerStatus(status);
-            } else if (intent.getAction().equals(SERVER_RECORDS_SENT_TOPIC)) {
-                int numberOfRecordsSent = intent.getIntExtra(SERVER_RECORDS_SENT_NUMBER, 0);
-                if (numberOfRecordsSent != -1) {
-                    getState().addRecordsSent(numberOfRecordsSent);
-                }
-            } else if (intent.getAction().equals(CACHE_TOPIC)) {
-                String topic = intent.getStringExtra(CACHE_TOPIC);
-                Pair<Long, Long> numberOfRecords = new Pair<>(
-                        intent.getLongExtra(CACHE_RECORDS_UNSENT_NUMBER, NUMBER_UNKNOWN),
-                        intent.getLongExtra(CACHE_RECORDS_SENT_NUMBER, NUMBER_UNKNOWN));
-                getState().putCachedRecords(topic, numberOfRecords);
+            String action = intent.getAction();
+            if (action == null) {
+                return;
+            }
+            switch (action) {
+                case SERVER_STATUS_CHANGED:
+                    final ServerStatusListener.Status status = ServerStatusListener.Status.values()[
+                            intent.getIntExtra(SERVER_STATUS_CHANGED, 0)];
+                    getState().setServerStatus(status);
+                    break;
+                case SERVER_RECORDS_SENT_TOPIC:
+                    int numberOfRecordsSent = intent.getIntExtra(SERVER_RECORDS_SENT_NUMBER, 0);
+                    if (numberOfRecordsSent != -1) {
+                        getState().addRecordsSent(numberOfRecordsSent);
+                    }
+                    break;
+                case CACHE_TOPIC:
+                    String topic = intent.getStringExtra(CACHE_TOPIC);
+                    Pair<Long, Long> numberOfRecords = new Pair<>(
+                            intent.getLongExtra(CACHE_RECORDS_UNSENT_NUMBER, NUMBER_UNKNOWN),
+                            intent.getLongExtra(CACHE_RECORDS_SENT_NUMBER, NUMBER_UNKNOWN));
+                    getState().putCachedRecords(topic, numberOfRecords);
+                    break;
             }
         }
     };
 
-    public ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate, boolean sendIp) {
+    public ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate, long tzUpdateRate, boolean sendIp) {
         super(service);
         this.sendIp = sendIp;
         serverTopic = createTopic("application_server_status", ApplicationServerStatus.class);
         recordCountsTopic = createTopic("application_record_counts", ApplicationRecordCounts.class);
         uptimeTopic = createTopic("application_uptime", ApplicationUptime.class);
         ntpTopic = createTopic("application_external_time", ApplicationExternalTime.class);
+        timeZoneTopic = createTopic("application_time_zone", ApplicationTimeZone.class);
 
         sntpClient = new SntpClient();
         setNtpServer(ntpServer);
 
         this.processor = new OfflineProcessor(service, this, APPLICATION_PROCESSOR_REQUEST_CODE,
                 APPLICATION_PROCESSOR_REQUEST_NAME, updateRate, false);
+        setTzUpdateRate(tzUpdateRate);
 
         setName(getService().getApplicationContext().getApplicationInfo().processName);
 
@@ -116,6 +131,9 @@ public class ApplicationStatusManager
         updateStatus(DeviceStatusListener.Status.READY);
 
         this.processor.start();
+        if (tzProcessor != null) {
+            tzProcessor.start();
+        }
 
         logger.info("Starting ApplicationStatusManager");
         IntentFilter filter = new IntentFilter();
@@ -271,5 +289,33 @@ public class ApplicationStatusManager
 
     public void setSendIp(boolean sendIp) {
         this.sendIp = sendIp;
+    }
+
+    public final void setTzUpdateRate(long tzUpdateRate) {
+        if (tzUpdateRate > 0) {
+            if (this.tzProcessor == null) {
+                this.tzProcessor = new OfflineProcessor(getService(), new TimeZoneUpdater(),
+                        APPLICATION_TZ_PROCESSOR_REQUEST_CODE,
+                        APPLICATION_TZ_PROCESSOR_REQUEST_NAME, tzUpdateRate, false);
+                if (this.getState().getStatus() == DeviceStatusListener.Status.CONNECTED) {
+                    this.tzProcessor.start();
+                }
+            } else {
+                this.tzProcessor.setInterval(tzUpdateRate);
+            }
+        } else if (this.tzProcessor != null) {
+            this.tzProcessor.close();
+            this.tzProcessor = null;
+        }
+    }
+
+    private class TimeZoneUpdater implements Runnable {
+        @Override
+        public void run() {
+            TimeZone tz = TimeZone.getDefault();
+            long now = System.currentTimeMillis();
+            int offset = tz.getOffset(now) / 1000;
+            send(timeZoneTopic, new ApplicationTimeZone(now / 1000d, offset));
+        }
     }
 }
