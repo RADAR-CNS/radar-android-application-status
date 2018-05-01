@@ -1,6 +1,6 @@
 # Application status plugin for RADAR-pRMT
 
-[![Build Status](https://travis-ci.org/RADAR-CNS/radar-android-application-status.svg?branch=master)](https://travis-ci.org/RADAR-CNS/radar-android-application-status)
+[![Build Status](https://travis-ci.org/RADAR-base/radar-android-application-status.svg?branch=master)](https://travis-ci.org/RADAR-base/radar-android-application-status)
 
 Plugin that sends application statuses about the RADAR pRMT app.
 
@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.radarcns:radar-android-application-status:0.2.2'
+    compile 'org.radarcns:radar-android-application-status:0.3'
 }
 ```
 
