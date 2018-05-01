@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.radarcns:radar-android-application-status:0.2.2'
+    compile 'org.radarcns:radar-android-application-status:0.3'
 }
 ```
 
