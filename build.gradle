@@ -89,8 +89,8 @@ configurations.compile {
 }
 
 repositories {
-    jcenter()
     google()
+    jcenter()
     maven { url 'https://oss.jfrog.org/artifactory/oss-snapshot-local' }
 }
 
