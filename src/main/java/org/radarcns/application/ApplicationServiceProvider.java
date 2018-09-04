@@ -33,10 +33,10 @@ public class ApplicationServiceProvider extends DeviceServiceProvider<Applicatio
     private static final long UPDATE_RATE_DEFAULT = 300L; // seconds == 5 minutes
     private static final long TZ_UPDATE_RATE_DEFAULT = 86400L; // seconds == 1 day
     private static final String NTP_SERVER_CONFIG = "ntp_server";
-    public static final String SEND_IP_KEY = PREFIX + SEND_IP;
-    public static final String UPDATE_RATE_KEY = PREFIX + UPDATE_RATE;
-    public static final String TZ_UPDATE_RATE_KEY = PREFIX + TZ_UPDATE_RATE;
-    public static final String NTP_SERVER_KEY = PREFIX + NTP_SERVER_CONFIG;
+    static final String SEND_IP_KEY = PREFIX + SEND_IP;
+    static final String UPDATE_RATE_KEY = PREFIX + UPDATE_RATE;
+    static final String TZ_UPDATE_RATE_KEY = PREFIX + TZ_UPDATE_RATE;
+    static final String NTP_SERVER_KEY = PREFIX + NTP_SERVER_CONFIG;
 
 
     @Override
