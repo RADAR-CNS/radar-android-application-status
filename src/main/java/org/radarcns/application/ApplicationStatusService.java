@@ -17,6 +17,8 @@
 package org.radarcns.application;
 
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+
 import org.radarcns.android.device.DeviceService;
 
 import static org.radarcns.application.ApplicationServiceProvider.NTP_SERVER_KEY;
@@ -42,12 +44,12 @@ public class ApplicationStatusService extends DeviceService<ApplicationState> {
     }
 
     @Override
-    protected void onInvocation(Bundle bundle) {
+    protected void onInvocation(@NonNull Bundle bundle) {
         super.onInvocation(bundle);
-        updateRate = bundle.getLong(UPDATE_RATE_KEY) * 1000L;
+        updateRate = bundle.getLong(UPDATE_RATE_KEY);
         ntpServer = bundle.getString(NTP_SERVER_KEY);
         sendIp = bundle.getBoolean(SEND_IP_KEY);
-        tzUpdateRate = bundle.getLong(TZ_UPDATE_RATE_KEY) * 1000L;
+        tzUpdateRate = bundle.getLong(TZ_UPDATE_RATE_KEY);
         ApplicationStatusManager manager = (ApplicationStatusManager)getDeviceManager();
         if (manager != null) {
             manager.setApplicationStatusUpdateRate(updateRate);

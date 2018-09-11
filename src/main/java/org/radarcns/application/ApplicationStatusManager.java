@@ -104,7 +104,7 @@ public class ApplicationStatusManager
         }
     };
 
-    public ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate, long tzUpdateRate, boolean sendIp) {
+    ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate, long tzUpdateRate, boolean sendIp) {
         super(service);
         this.sendIp = sendIp;
         serverTopic = createTopic("application_server_status", ApplicationServerStatus.class);
@@ -179,7 +179,7 @@ public class ApplicationStatusManager
         processor.setInterval(period);
     }
 
-    public void processReferenceTime() {
+    private void processReferenceTime() {
         String localServer;
         synchronized (this) {
             localServer = ntpServer;
@@ -197,7 +197,7 @@ public class ApplicationStatusManager
         }
     }
 
-    public void processServerStatus() {
+    private void processServerStatus() {
         double time = System.currentTimeMillis() / 1_000d;
 
         ServerStatus status;
@@ -250,13 +250,13 @@ public class ApplicationStatusManager
         }
     }
 
-    public void processUptime() {
+    private void processUptime() {
         double time = System.currentTimeMillis() / 1_000d;
         double uptime = (System.currentTimeMillis() - creationTimeStamp)/1000d;
         send(uptimeTopic, new ApplicationUptime(time, uptime));
     }
 
-    public void processRecordsSent() {
+    private void processRecordsSent() {
         double time = System.currentTimeMillis() / 1_000d;
 
         int recordsCachedUnsent = 0;

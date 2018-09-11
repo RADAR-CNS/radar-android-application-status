@@ -19,6 +19,7 @@ package org.radarcns.application;
 import android.os.SystemClock;
 import android.util.Log;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -37,7 +38,6 @@ import java.util.Arrays;
 public class SntpClient {
     private static final String TAG = "SntpClient";
     private static final boolean DBG = true;
-    private static final int REFERENCE_TIME_OFFSET = 16;
     private static final int ORIGINATE_TIME_OFFSET = 24;
     private static final int RECEIVE_TIME_OFFSET = 32;
     private static final int TRANSMIT_TIME_OFFSET = 40;
@@ -59,8 +59,8 @@ public class SntpClient {
     private long mNtpTimeReference;
     // round trip time in milliseconds
     private long mRoundTripTime;
-    private static class InvalidServerReplyException extends Exception {
-        public InvalidServerReplyException(String message) {
+    private static class InvalidServerReplyException extends IOException {
+        InvalidServerReplyException(String message) {
             super(message);
         }
     }
@@ -72,7 +72,7 @@ public class SntpClient {
      * @return true if the transaction was successful.
      */
     public boolean requestTime(String host, int timeout) {
-        InetAddress address = null;
+        InetAddress address;
         try {
             address = InetAddress.getByName(host);
         } catch (Exception e) {
@@ -81,6 +81,8 @@ public class SntpClient {
         }
         return requestTime(address, NTP_PORT, timeout);
     }
+
+    @SuppressWarnings("WeakerAccess")
     public boolean requestTime(InetAddress address, int port, int timeout) {
         DatagramSocket socket = null;
         try {
@@ -105,7 +107,7 @@ public class SntpClient {
             // extract the results
             final byte leap = (byte) ((buffer[0] >> 6) & 0x3);
             final byte mode = (byte) (buffer[0] & 0x7);
-            final int stratum = (int) (buffer[1] & 0xff);
+            final int stratum = buffer[1] & 0xff;
             final long originateTime = readTimeStamp(buffer, ORIGINATE_TIME_OFFSET);
             final long receiveTime = readTimeStamp(buffer, RECEIVE_TIME_OFFSET);
             final long transmitTime = readTimeStamp(buffer, TRANSMIT_TIME_OFFSET);
@@ -227,13 +229,13 @@ public class SntpClient {
         buffer[offset++] = (byte)(seconds >> 24);
         buffer[offset++] = (byte)(seconds >> 16);
         buffer[offset++] = (byte)(seconds >> 8);
-        buffer[offset++] = (byte)(seconds >> 0);
+        buffer[offset++] = (byte)seconds;
         long fraction = milliseconds * 0x100000000L / 1000L;
         // write fraction in big endian format
         buffer[offset++] = (byte)(fraction >> 24);
         buffer[offset++] = (byte)(fraction >> 16);
         buffer[offset++] = (byte)(fraction >> 8);
         // low order bits should be random data
-        buffer[offset++] = (byte)(Math.random() * 255.0);
+        buffer[offset] = (byte)(Math.random() * 255.0);
     }
 }
