@@ -54,6 +54,7 @@ public class ApplicationServiceProvider extends DeviceServiceProvider<Applicatio
         return false;
     }
 
+    @NonNull
     @Override
     public List<String> needsPermissions() {
         return Collections.emptyList();

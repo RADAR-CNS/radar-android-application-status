@@ -21,6 +21,8 @@ import android.support.annotation.NonNull;
 
 import org.radarcns.android.device.DeviceService;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.radarcns.application.ApplicationServiceProvider.NTP_SERVER_KEY;
 import static org.radarcns.application.ApplicationServiceProvider.SEND_IP_KEY;
 import static org.radarcns.application.ApplicationServiceProvider.TZ_UPDATE_RATE_KEY;
@@ -35,7 +37,7 @@ public class ApplicationStatusService extends DeviceService<ApplicationState> {
     @Override
     protected ApplicationStatusManager createDeviceManager() {
         return new ApplicationStatusManager(
-                this, ntpServer, updateRate, tzUpdateRate, sendIp);
+                this, ntpServer, updateRate, tzUpdateRate, TimeUnit.SECONDS, sendIp);
     }
 
     @Override
@@ -52,10 +54,10 @@ public class ApplicationStatusService extends DeviceService<ApplicationState> {
         tzUpdateRate = bundle.getLong(TZ_UPDATE_RATE_KEY);
         ApplicationStatusManager manager = (ApplicationStatusManager)getDeviceManager();
         if (manager != null) {
-            manager.setApplicationStatusUpdateRate(updateRate);
+            manager.setApplicationStatusUpdateRate(updateRate, TimeUnit.SECONDS);
             manager.setNtpServer(ntpServer);
             manager.setSendIp(sendIp);
-            manager.setTzUpdateRate(tzUpdateRate);
+            manager.setTzUpdateRate(tzUpdateRate, TimeUnit.SECONDS);
         }
     }
 }

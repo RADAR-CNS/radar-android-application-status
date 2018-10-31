@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Pair;
 import org.radarcns.android.device.AbstractDeviceManager;
 import org.radarcns.android.device.DeviceStatusListener;
@@ -40,6 +41,7 @@ import java.net.SocketException;
 import java.util.Enumeration;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 
 import static org.radarcns.android.device.DeviceService.CACHE_RECORDS_SENT_NUMBER;
 import static org.radarcns.android.device.DeviceService.CACHE_RECORDS_UNSENT_NUMBER;
@@ -48,6 +50,7 @@ import static org.radarcns.android.device.DeviceService.SERVER_RECORDS_SENT_NUMB
 import static org.radarcns.android.device.DeviceService.SERVER_RECORDS_SENT_TOPIC;
 import static org.radarcns.android.device.DeviceService.SERVER_STATUS_CHANGED;
 
+@SuppressWarnings("WeakerAccess")
 public class ApplicationStatusManager
         extends AbstractDeviceManager<ApplicationStatusService, ApplicationState>
         implements Runnable {
@@ -104,7 +107,7 @@ public class ApplicationStatusManager
         }
     };
 
-    ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate, long tzUpdateRate, boolean sendIp) {
+    ApplicationStatusManager(ApplicationStatusService service, String ntpServer, long updateRate, long tzUpdateRate, TimeUnit unit, boolean sendIp) {
         super(service);
         this.sendIp = sendIp;
         serverTopic = createTopic("application_server_status", ApplicationServerStatus.class);
@@ -117,8 +120,8 @@ public class ApplicationStatusManager
         setNtpServer(ntpServer);
 
         this.processor = new OfflineProcessor(service, this, APPLICATION_PROCESSOR_REQUEST_CODE,
-                APPLICATION_PROCESSOR_REQUEST_NAME, updateRate, false);
-        setTzUpdateRate(tzUpdateRate);
+                APPLICATION_PROCESSOR_REQUEST_NAME, updateRate, unit, false);
+        setTzUpdateRate(tzUpdateRate, unit);
 
         setName(getService().getApplicationContext().getApplicationInfo().processName);
 
@@ -140,7 +143,8 @@ public class ApplicationStatusManager
         filter.addAction(SERVER_STATUS_CHANGED);
         filter.addAction(SERVER_RECORDS_SENT_TOPIC);
         filter.addAction(CACHE_TOPIC);
-        getService().registerReceiver(serverStatusListener, filter);
+        LocalBroadcastManager.getInstance(getService())
+                .registerReceiver(serverStatusListener, filter);
 
         updateStatus(DeviceStatusListener.Status.CONNECTED);
     }
@@ -175,8 +179,8 @@ public class ApplicationStatusManager
         }
     }
 
-    public void setApplicationStatusUpdateRate(long period) {
-        processor.setInterval(period);
+    public void setApplicationStatusUpdateRate(long period, TimeUnit unit) {
+        processor.setInterval(period, unit);
     }
 
     private void processReferenceTime() {
@@ -283,7 +287,8 @@ public class ApplicationStatusManager
     public void close() throws IOException {
         logger.info("Closing ApplicationStatusManager");
         this.processor.close();
-        getService().unregisterReceiver(serverStatusListener);
+        LocalBroadcastManager.getInstance(getService())
+                .unregisterReceiver(serverStatusListener);
         super.close();
     }
 
@@ -291,17 +296,17 @@ public class ApplicationStatusManager
         this.sendIp = sendIp;
     }
 
-    public final void setTzUpdateRate(long tzUpdateRate) {
+    public final void setTzUpdateRate(long tzUpdateRate, TimeUnit unit) {
         if (tzUpdateRate > 0) {
             if (this.tzProcessor == null) {
                 this.tzProcessor = new OfflineProcessor(getService(), new TimeZoneUpdater(),
                         APPLICATION_TZ_PROCESSOR_REQUEST_CODE,
-                        APPLICATION_TZ_PROCESSOR_REQUEST_NAME, tzUpdateRate, false);
+                        APPLICATION_TZ_PROCESSOR_REQUEST_NAME, tzUpdateRate, unit, false);
                 if (this.getState().getStatus() == DeviceStatusListener.Status.CONNECTED) {
                     this.tzProcessor.start();
                 }
             } else {
-                this.tzProcessor.setInterval(tzUpdateRate);
+                this.tzProcessor.setInterval(tzUpdateRate, unit);
             }
         } else if (this.tzProcessor != null) {
             this.tzProcessor.close();
