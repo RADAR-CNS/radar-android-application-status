@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Pair;
 import org.radarcns.android.device.AbstractDeviceManager;
 import org.radarcns.android.device.DeviceStatusListener;
@@ -142,7 +143,8 @@ public class ApplicationStatusManager
         filter.addAction(SERVER_STATUS_CHANGED);
         filter.addAction(SERVER_RECORDS_SENT_TOPIC);
         filter.addAction(CACHE_TOPIC);
-        getService().registerReceiver(serverStatusListener, filter);
+        LocalBroadcastManager.getInstance(getService())
+                .registerReceiver(serverStatusListener, filter);
 
         updateStatus(DeviceStatusListener.Status.CONNECTED);
     }
@@ -285,7 +287,8 @@ public class ApplicationStatusManager
     public void close() throws IOException {
         logger.info("Closing ApplicationStatusManager");
         this.processor.close();
-        getService().unregisterReceiver(serverStatusListener);
+        LocalBroadcastManager.getInstance(getService())
+                .unregisterReceiver(serverStatusListener);
         super.close();
     }
 
