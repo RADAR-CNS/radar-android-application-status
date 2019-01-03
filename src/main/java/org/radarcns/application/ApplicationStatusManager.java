@@ -119,13 +119,17 @@ public class ApplicationStatusManager
         sntpClient = new SntpClient();
         setNtpServer(ntpServer);
 
-        this.processor = new OfflineProcessor(service, this, APPLICATION_PROCESSOR_REQUEST_CODE,
-                APPLICATION_PROCESSOR_REQUEST_NAME, updateRate, unit, false);
+        this.processor = new OfflineProcessor.Builder(service, this)
+                .requestIdentifier(APPLICATION_PROCESSOR_REQUEST_CODE, APPLICATION_PROCESSOR_REQUEST_NAME)
+                .interval(updateRate, unit)
+                .wake(false)
+                .build();
+
         setTzUpdateRate(tzUpdateRate, unit);
 
         setName(getService().getApplicationContext().getApplicationInfo().processName);
 
-        creationTimeStamp = System.currentTimeMillis();
+        creationTimeStamp = SystemClock.elapsedRealtime();
         previousInetAddress = null;
     }
 
@@ -256,7 +260,7 @@ public class ApplicationStatusManager
 
     private void processUptime() {
         double time = System.currentTimeMillis() / 1_000d;
-        double uptime = (System.currentTimeMillis() - creationTimeStamp)/1000d;
+        double uptime = (SystemClock.elapsedRealtime() - creationTimeStamp)/1000d;
         send(uptimeTopic, new ApplicationUptime(time, uptime));
     }
 
@@ -299,9 +303,11 @@ public class ApplicationStatusManager
     public final void setTzUpdateRate(long tzUpdateRate, TimeUnit unit) {
         if (tzUpdateRate > 0) {
             if (this.tzProcessor == null) {
-                this.tzProcessor = new OfflineProcessor(getService(), new TimeZoneUpdater(),
-                        APPLICATION_TZ_PROCESSOR_REQUEST_CODE,
-                        APPLICATION_TZ_PROCESSOR_REQUEST_NAME, tzUpdateRate, unit, false);
+                this.tzProcessor = new OfflineProcessor.Builder(getService(), new TimeZoneUpdater())
+                        .requestIdentifier(APPLICATION_TZ_PROCESSOR_REQUEST_CODE, APPLICATION_TZ_PROCESSOR_REQUEST_NAME)
+                        .interval(tzUpdateRate, unit)
+                        .wake(false)
+                        .build();
                 if (this.getState().getStatus() == DeviceStatusListener.Status.CONNECTED) {
                     this.tzProcessor.start();
                 }
