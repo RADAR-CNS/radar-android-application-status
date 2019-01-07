@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.radarcns:radar-android-application-status:0.3.3'
+    runtimeOnly 'org.radarcns:radar-android-application-status:0.3.3'
 }
 ```
 
