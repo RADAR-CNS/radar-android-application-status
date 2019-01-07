@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.radarcns:radar-android-application-status:0.3.2'
+    runtimeOnly 'org.radarcns:radar-android-application-status:0.3.3'
 }
 ```
 
@@ -39,7 +39,8 @@ This plugin produces data for the following topics: (types starts with `org.rada
 | `application_record_counts` | `ApplicationRecordCounts` | Number of records sent and in queue. |
 | `application_uptime` | `ApplicationUptime` | Time since the device booted. |
 | `application_server_status` | `ApplicationServerStatus` | Server connection status. |
-| `application_time_zone` | `ApplicationTimeZone` | Application time zone. |
+| `application_time_zone` | `ApplicationTimeZone` | Application time zone. Data is only sent on updates. |
+| `application_device_info` | `ApplicationDeviceInfo` | Device information. Data is only sent on updates. |
 
 ## Contributing
 

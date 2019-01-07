@@ -20,6 +20,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
@@ -39,6 +43,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Enumeration;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -52,8 +57,7 @@ import static org.radarcns.android.device.DeviceService.SERVER_STATUS_CHANGED;
 
 @SuppressWarnings("WeakerAccess")
 public class ApplicationStatusManager
-        extends AbstractDeviceManager<ApplicationStatusService, ApplicationState>
-        implements Runnable {
+        extends AbstractDeviceManager<ApplicationStatusService, ApplicationState> {
     private static final Logger logger = LoggerFactory.getLogger(ApplicationStatusManager.class);
     private static final Long NUMBER_UNKNOWN = -1L;
     private static final int APPLICATION_PROCESSOR_REQUEST_CODE = 72553575;
@@ -66,16 +70,20 @@ public class ApplicationStatusManager
     private final AvroTopic<ObservationKey, ApplicationUptime> uptimeTopic;
     private final AvroTopic<ObservationKey, ApplicationExternalTime> ntpTopic;
     private final AvroTopic<ObservationKey, ApplicationTimeZone> timeZoneTopic;
+    private final AvroTopic<ObservationKey, ApplicationDeviceInfo> deviceInfoTopic;
 
     private final OfflineProcessor processor;
     private final long creationTimeStamp;
     private final SntpClient sntpClient;
+    private final SharedPreferences prefs;
+    private ApplicationDeviceInfo storedDeviceInfo;
     private OfflineProcessor tzProcessor;
     private boolean sendIp;
 
     private String ntpServer;
 
     private InetAddress previousInetAddress;
+    private int previousOffset;
 
     private final BroadcastReceiver serverStatusListener = new BroadcastReceiver() {
         @Override
@@ -115,18 +123,103 @@ public class ApplicationStatusManager
         uptimeTopic = createTopic("application_uptime", ApplicationUptime.class);
         ntpTopic = createTopic("application_external_time", ApplicationExternalTime.class);
         timeZoneTopic = createTopic("application_time_zone", ApplicationTimeZone.class);
+        deviceInfoTopic = createTopic("application_device_info", ApplicationDeviceInfo.class);
 
         sntpClient = new SntpClient();
         setNtpServer(ntpServer);
 
-        this.processor = new OfflineProcessor(service, this, APPLICATION_PROCESSOR_REQUEST_CODE,
-                APPLICATION_PROCESSOR_REQUEST_NAME, updateRate, unit, false);
+        this.processor = new OfflineProcessor.Builder(service)
+                .addProcess(this::processServerStatus)
+                .addProcess(this::processUptime)
+                .addProcess(this::processRecordsSent)
+                .addProcess(this::processReferenceTime)
+                .addProcess(this::processDeviceInfo)
+                .requestIdentifier(APPLICATION_PROCESSOR_REQUEST_CODE, APPLICATION_PROCESSOR_REQUEST_NAME)
+                .interval(updateRate, unit)
+                .wake(false)
+                .build();
+
+        this.prefs = service.getSharedPreferences(ApplicationStatusManager.class.getName(), Context.MODE_PRIVATE);
+        this.previousOffset = -1;
+
+        Integer osVersionCode = this.prefs.getInt("operatingSystemVersionCode", -1);
+        if (osVersionCode == -1) {
+            osVersionCode = null;
+        }
+        Integer appVersionCode = this.prefs.getInt("appVersionCode", -1);
+        if (appVersionCode == -1) {
+            appVersionCode = null;
+        }
+        this.storedDeviceInfo = new ApplicationDeviceInfo(
+                0.0,
+                this.prefs.getString("manufacturer", null),
+                this.prefs.getString("model", null),
+                OperatingSystem.ANDROID,
+                this.prefs.getString("operatingSystemVersion", null),
+                osVersionCode,
+                this.prefs.getString("appVersion", null),
+                appVersionCode);
+
+        this.previousOffset = this.prefs.getInt("timeZoneOffset", -1);
+
         setTzUpdateRate(tzUpdateRate, unit);
 
         setName(getService().getApplicationContext().getApplicationInfo().processName);
 
-        creationTimeStamp = System.currentTimeMillis();
+        creationTimeStamp = SystemClock.elapsedRealtime();
         previousInetAddress = null;
+    }
+
+    // using versionCode
+    @SuppressWarnings("deprecation")
+    private void processDeviceInfo() {
+        long time = System.currentTimeMillis();
+
+        String versionName;
+        Integer versionCode;
+
+        try {
+            PackageInfo packageInfo = getService().getPackageManager()
+                    .getPackageInfo(getService().getPackageName(), 0);
+            versionName = packageInfo.versionName;
+            versionCode = packageInfo.versionCode;
+        } catch (PackageManager.NameNotFoundException ex) {
+            logger.error("Cannot find package info for pRMT app");
+            versionName = null;
+            versionCode = null;
+        }
+
+        ApplicationDeviceInfo deviceInfo = new ApplicationDeviceInfo(
+                time / 1000d,
+                Build.MANUFACTURER,
+                Build.MODEL,
+                OperatingSystem.ANDROID,
+                Build.VERSION.RELEASE,
+                Build.VERSION.SDK_INT,
+                versionName,
+                versionCode);
+
+        if (!Objects.equals(deviceInfo.getManufacturer(), storedDeviceInfo.getManufacturer())
+                || !Objects.equals(deviceInfo.getModel(), storedDeviceInfo.getModel())
+                || !Objects.equals(deviceInfo.getOperatingSystemVersion(), storedDeviceInfo.getOperatingSystemVersion())
+                || !Objects.equals(deviceInfo.getOperatingSystemVersionCode(), storedDeviceInfo.getOperatingSystemVersionCode())
+                || !Objects.equals(deviceInfo.getAppVersion(), storedDeviceInfo.getAppVersion())
+                || !Objects.equals(deviceInfo.getAppVersionCode(), storedDeviceInfo.getAppVersionCode())) {
+
+            send(deviceInfoTopic, deviceInfo);
+            storedDeviceInfo = deviceInfo;
+            prefs.edit()
+                    .putString("manufacturer", deviceInfo.getManufacturer())
+                    .putString("model", deviceInfo.getModel())
+                    .putString("operatingSystemVersion", deviceInfo.getOperatingSystemVersion())
+                    .putInt("operatingSystemVersionCode",
+                            deviceInfo.getOperatingSystemVersionCode() != null
+                            ? deviceInfo.getOperatingSystemVersionCode() : -1)
+                    .putString("appVersion", deviceInfo.getAppVersion())
+                    .putInt("appVersionCode", deviceInfo.getAppVersionCode() != null
+                            ? deviceInfo.getAppVersionCode() : -1)
+                    .apply();
+        }
     }
 
     @Override
@@ -154,28 +247,6 @@ public class ApplicationStatusManager
             this.ntpServer = null;
         } else {
             this.ntpServer = server.trim();
-        }
-    }
-
-    @Override
-    public void run() {
-        logger.info("Updating application status");
-        try {
-            processServerStatus();
-            if (processor.isDone()) {
-                return;
-            }
-            processUptime();
-            if (processor.isDone()) {
-                return;
-            }
-            processRecordsSent();
-            if (processor.isDone()) {
-                return;
-            }
-            processReferenceTime();
-        } catch (Exception e) {
-            logger.error("Failed to update application status", e);
         }
     }
 
@@ -256,7 +327,7 @@ public class ApplicationStatusManager
 
     private void processUptime() {
         double time = System.currentTimeMillis() / 1_000d;
-        double uptime = (System.currentTimeMillis() - creationTimeStamp)/1000d;
+        double uptime = (SystemClock.elapsedRealtime() - creationTimeStamp)/1000d;
         send(uptimeTopic, new ApplicationUptime(time, uptime));
     }
 
@@ -299,9 +370,23 @@ public class ApplicationStatusManager
     public final void setTzUpdateRate(long tzUpdateRate, TimeUnit unit) {
         if (tzUpdateRate > 0) {
             if (this.tzProcessor == null) {
-                this.tzProcessor = new OfflineProcessor(getService(), new TimeZoneUpdater(),
-                        APPLICATION_TZ_PROCESSOR_REQUEST_CODE,
-                        APPLICATION_TZ_PROCESSOR_REQUEST_NAME, tzUpdateRate, unit, false);
+                this.tzProcessor = new OfflineProcessor.Builder(getService(),
+                        () -> {
+                            TimeZone tz = TimeZone.getDefault();
+                            long now = System.currentTimeMillis();
+                            int offset = tz.getOffset(now) / 1000;
+                            if (offset != previousOffset) {
+                                send(timeZoneTopic, new ApplicationTimeZone(now / 1000d, offset));
+                                previousOffset = offset;
+                                this.prefs.edit()
+                                        .putInt("timeZoneOffset", offset)
+                                        .apply();
+                            }
+                        })
+                        .requestIdentifier(APPLICATION_TZ_PROCESSOR_REQUEST_CODE, APPLICATION_TZ_PROCESSOR_REQUEST_NAME)
+                        .interval(tzUpdateRate, unit)
+                        .wake(false)
+                        .build();
                 if (this.getState().getStatus() == DeviceStatusListener.Status.CONNECTED) {
                     this.tzProcessor.start();
                 }
@@ -311,16 +396,6 @@ public class ApplicationStatusManager
         } else if (this.tzProcessor != null) {
             this.tzProcessor.close();
             this.tzProcessor = null;
-        }
-    }
-
-    private class TimeZoneUpdater implements Runnable {
-        @Override
-        public void run() {
-            TimeZone tz = TimeZone.getDefault();
-            long now = System.currentTimeMillis();
-            int offset = tz.getOffset(now) / 1000;
-            send(timeZoneTopic, new ApplicationTimeZone(now / 1000d, offset));
         }
     }
 }
