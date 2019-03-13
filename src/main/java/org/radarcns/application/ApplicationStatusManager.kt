@@ -124,14 +124,14 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
 
             val deviceInfo = currentDeviceInfo
 
-            register(name = "pRMT", physicalId = service.application.packageName, attributes = mapOf(
+            register(name = "pRMT", attributes = mapOf(
                     Pair("manufacturer", deviceInfo.getManufacturer()),
                     Pair("model", deviceInfo.getModel()),
                     Pair("operatingSystem", deviceInfo.getOperatingSystem().toString()),
                     Pair("operatingSystemVersion", deviceInfo.getOperatingSystemVersion().toString()),
                     Pair("appVersion", deviceInfo.getAppVersion()),
-                    Pair("appVersionCode", appVersionCode.toString())
-            ))
+                    Pair("appVersionCode", appVersionCode.toString()),
+                    Pair("appName", service.application.packageName)))
 
             this.previousOffset = this.prefs.getInt("timeZoneOffset", -1)
         }
