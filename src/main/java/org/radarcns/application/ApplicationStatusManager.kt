@@ -72,7 +72,7 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
         set(value) {
             field = value
                     ?.let { it.trim { c -> c <= ' ' } }
-                    ?.let { if (it.isEmpty()) null else it }
+                    ?.takeIf(String::isNotEmpty)
         }
 
     private var previousInetAddress: InetAddress? = null
@@ -159,14 +159,11 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
     private val currentDeviceInfo: ApplicationDeviceInfo
         get() {
             val packageInfo = try {
-                service.packageManager
-                        .getPackageInfo(service.packageName, 0)
+                service.packageManager.getPackageInfo(service.packageName, 0)
             } catch (ex: PackageManager.NameNotFoundException) {
                 logger.error("Cannot find package info for pRMT app")
                 null
             }
-            val versionName: String? = packageInfo?.versionName
-            val versionCode: Int? = packageInfo?.versionCode
 
             return ApplicationDeviceInfo(
                     System.currentTimeMillis() / 1000.0,
@@ -175,8 +172,8 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
                     OperatingSystem.ANDROID,
                     Build.VERSION.RELEASE,
                     Build.VERSION.SDK_INT,
-                    versionName,
-                    versionCode)
+                    packageInfo?.versionName,
+                    packageInfo?.versionCode)
         }
 
     // using versionCode
@@ -206,7 +203,7 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
         ntpServer?.let { server ->
             if (sntpClient.requestTime(server, 5000)) {
                 val delay = sntpClient.roundTripTime / 1000.0
-                val time = System.currentTimeMillis() / 1000.0
+                val time = currentTime
                 val ntpTime = (sntpClient.ntpTime + SystemClock.elapsedRealtime() - sntpClient.ntpTimeReference) / 1000.0
 
                 send(ntpTopic, ApplicationExternalTime(time, ntpTime,
@@ -216,7 +213,7 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
     }
 
     private fun processServerStatus() {
-        val time = System.currentTimeMillis() / 1_000.0
+        val time = currentTime
 
         val status: ServerStatus = when (state.serverStatus) {
             ServerStatusListener.Status.CONNECTED, ServerStatusListener.Status.READY, ServerStatusListener.Status.UPLOADING -> ServerStatus.CONNECTED
@@ -226,9 +223,7 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
         val ipAddress = if (isProcessingIp) lookupIpAddress() else null
         logger.info("Server Status: {}; Device IP: {}", status, ipAddress)
 
-        val value = ApplicationServerStatus(time, status, ipAddress)
-
-        send(serverTopic, value)
+        send(serverTopic, ApplicationServerStatus(time, status, ipAddress))
     }
 
     // Find Ip via NetworkInterfaces. Works via wifi, ethernet and mobile network
@@ -248,13 +243,13 @@ class ApplicationStatusManager internal constructor(service: ApplicationStatusSe
     }
 
     private fun processUptime() {
-        val time = System.currentTimeMillis() / 1_000.0
+        val time = currentTime
         val uptime = (SystemClock.elapsedRealtime() - creationTimeStamp) / 1000.0
         send(uptimeTopic, ApplicationUptime(time, uptime))
     }
 
     private fun processRecordsSent() {
-        val time = System.currentTimeMillis() / 1_000.0
+        val time = currentTime
 
         var recordsCachedUnsent = state.cachedRecords.values.sum().toIntCapped()
         val recordsCachedSent = 0
