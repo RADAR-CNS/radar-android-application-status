@@ -1,3 +1,7 @@
+# DEPRECATION NOTICE
+
+All plugin development has moved to https://github.com/RADAR-base/radar-commons-android in the plugins directory. Please view that directory for examples of a plugin.
+
 # Application status plugin for RADAR-pRMT
 
 [![Build Status](https://travis-ci.org/RADAR-base/radar-android-application-status.svg?branch=master)](https://travis-ci.org/RADAR-base/radar-android-application-status)
